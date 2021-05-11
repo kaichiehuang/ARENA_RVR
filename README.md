@@ -1,4 +1,3 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>ARENA Robot Project.md</title><style></style></head><body id="preview">
 <h1 class="code-line" data-line-start=0 data-line-end=1><a id="ARENA_Robot_Project_0"></a>ARENA Robot Project</h1>
 <h2 class="code-line" data-line-start=1 data-line-end=2><a id="_Interact_with_Sphero_RVR_in_ARENA__1"></a><em>Interact with Sphero RVR in ARENA</em></h2>
 <p class="has-line-data" data-line-start="3" data-line-end="5">This project demos the possibilities of interacting with a mobile robot in a ARENA<br>
