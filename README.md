@@ -72,7 +72,13 @@ asyncio.ensure_future(self._check_rvr_fw())
 <li class="has-line-data" data-line-start="70" data-line-end="73">Path planning algorithm<br>
 – <a href="https://www.redblobgames.com/pathfinding/a-star/introduction.html">Concept</a><br>
 – <a href="https://www.redblobgames.com/pathfinding/a-star/implementation.html">Implementation examples</a></li>
-<li class="has-line-data" data-line-start="73" data-line-end="75">Future work<br>
+<li class="has-line-data" data-line-start="73" data-line-end="76">Future work<br>
 –<a href="https://www.intechopen.com/books/robot-control/occupancy-map-construction-for-indoor-robot-navigation#E5">Occupancy Map Construction for Indoor Robot Navigation</a></li>
+</ul>
+<h2 class="code-line" data-line-start=76 data-line-end=77><a id="Limitations_and_other_information_76"></a>Limitations and other information</h2>
+<ul>
+<li class="has-line-data" data-line-start="77" data-line-end="78">Small April tag isn’t supported by the current ARENA-py library so RVR’s initial position and direction is hard coded. (See demo video)</li>
+<li class="has-line-data" data-line-start="78" data-line-end="79">Each cell size is 30cm * 30cm</li>
+<li class="has-line-data" data-line-start="79" data-line-end="80">The x, y value in the current implemention of grid map does not have negative value. That is, everything is happening at x&gt;=0 and y&gt;=0 in the grid map’s coordinate system.</li>
 </ul>
 </body></html>
