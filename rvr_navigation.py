@@ -452,7 +452,6 @@ def user_join_callback(scene, cam, msg):
 
 
 @ scene.run_async
-# @scene.run_once
 async def main():
     global loop, rvr, grid
     loop = asyncio.get_event_loop()
