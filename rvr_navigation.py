@@ -16,11 +16,11 @@ from collections import deque
 sys.path.append(os.path.abspath(os.path.join(
     os.path.dirname(__file__), '../../../')))
 scene = Scene(host="arena.andrew.cmu.edu", realm="realm", scene="jameshuang")
-loop, rvr = None, None
+loop, rvr = None, None 
 distance_to_obstacle = 10000  # in cm
-rvr_direction = (0, 1)
+rvr_direction = (0, 1) # Hard coded as small april tag is not supported right now
 rvr_position = (0, 0)  # Data from locator
-grid = None  # grid map
+grid = None  # grid map, initialized in main
 canvas = {}
 RED = (255, 0, 0)
 destinations = {}
@@ -33,7 +33,7 @@ echo = 21
 GPIO.setup(trigger, GPIO.OUT)
 GPIO.setup(echo, GPIO.IN)
 
-
+#occupancy grid
 class GridMap:
     def __init__(self, width, height):
         self.width = width
@@ -61,22 +61,29 @@ class GridMap:
         self.obstacles.append(id)
 
     def draw_outline(self):
+        """draw the occupancy grid on the scene"""
         # height_arena = self.height * 0.3
         # width_arena = self.width * 0.3
-        height_arena = 5 * 0.3
-        width_arena = 5 * 0.3
-        start = (-0.15, 0, 0.15)
-        for _ in range(5+1):
+        height, width = 5, 5  #hard coded the height and width to 5 for purpose of demo, the underlying grid size is still the same
+        height_arena = height * 0.3
+        width_arena = width * 0.3
+        start = (-0.15, 0, 0.15) #bottom left corner
+
+        #draw horizontal lines
+        for _ in range(height+1):
             draw_line(start, tuple(np.add(start, (width_arena, 0, 0))))
+            #each cell is 30cm
             start = tuple(np.add(start, (0, 0, -0.3)))
 
         start = (-0.15, 0, 0.15)
-        for _ in range(5+1):
+        #draw vertical lines
+        for _ in range(width+1):
             draw_line(start, tuple(np.add(start, (0, 0, -height_arena))))
             start = tuple(np.add(start, (0.3, 0, 0)))
 
 
 class PriorityQueue:
+    """used by path planning algorithm"""
     def __init__(self):
         self.elements = []
 
@@ -114,10 +121,9 @@ def plan_path(graph, start, goal):
 
 
 def reconstruct_path(came_from, start, goal):
+    """Takes the result from plan_path and reconstruct the path into a list"""
     current = goal
     path = []
-    print("in reconstruct path, goal is {}".format(goal))
-    print(came_from)
     while current != start:
         path.append(current)
         current = came_from[current]
@@ -127,7 +133,10 @@ def reconstruct_path(came_from, start, goal):
 
 
 def pose_convert(original, to, position):
-    if original == 'arena' and to == 'grid':
+    """Converts between coordinate system"""
+    #each grid size is 30cm
+    # +x in grid aligns +x of arena, +y of grid is -z of arena
+    if original == 'arena' and to == 'grid': 
         x = round(position[0]/0.3)
         y = -round(position[2]/0.3)
         print("After convert, ({},{})".format(x, y))
@@ -138,9 +147,10 @@ def pose_convert(original, to, position):
         z = -position[1] * 0.3
         print("After convert, ({},{},{})".format(x, y, z))
         return (x, y, z)
+    # rvr's coordinate direction is aligned with grid's, just that rvr is hard coded to start from the cell +1 in the y direction 
     elif original == 'rvr' and to == 'grid':
         x = round(position[0]/0.3)
-        y = round(position[1]/0.3) + 1
+        y = round(position[1]/0.3) + 1 
         print("After convert, ({},{})".format(x, y))
         return (x, y)
     elif original == 'grid' and to == 'rvr':
@@ -158,30 +168,21 @@ def angle_between(v1, v2):
 
 
 def unit_vector(vector):
-    """ Returns the unit vector of the vector.  """
+    """ Returns the unit vector of the vector."""
     return vector / np.linalg.norm(vector)
 
 # below are rvr functions
-
-
 async def locator_handler(locator_data):
+    """handler of location streaming, constantly updating the robot location"""
     global rvr_position
-    # print('Locator data response: ', locator_data)
     loc_dict = locator_data['Locator']
     if loc_dict['is_valid']:
-        # print(loc_dict['X'])
-        # print(loc_dict['Y'])
         loc_X = loc_dict['X']
         loc_Y = loc_dict['Y']
         rvr_position = (loc_X, loc_Y)
 
-
-async def color_detected_handler(color_detected_data):
-    # print('Color detection data response: ', color_detected_data)
-    pass
-
-
 async def rvr_setup():
+    """setup location data streaming"""
     global rvr
     await rvr.wake()
     # Give RVR time to wake up
@@ -196,37 +197,34 @@ async def rvr_setup():
         service=RvrStreamingServices.locator,
         handler=locator_handler
     )
-    await rvr.enable_color_detection(is_enabled=True)
-    await rvr.sensor_control.add_sensor_data_handler(
-        service=RvrStreamingServices.color_detection,
-        handler=color_detected_handler
-    )
+    # await rvr.enable_color_detection(is_enabled=True)
+    # await rvr.sensor_control.add_sensor_data_handler(
+    #     service=RvrStreamingServices.color_detection,
+    #     handler=color_detected_handler
+    # )
     await rvr.sensor_control.start(interval=200)
 
 
 async def rvr_turn(degree):
     global rvr
-    print("in turn")
-    print(degree)
     await rvr.reset_yaw()
     await rvr.drive_with_heading(
         speed=0,  # Valid speed values are 0-255
-        heading=int(degree),  # Valid heading values are 0-359
+        heading=int(degree),  # Valid heading values are 0-359, 90 is turn right 90 degrees, 270 is turn left 90 degrees
         flags=DriveFlagsBitmask.none.value
     )
     # Delay to allow RVR to turn
     await asyncio.sleep(1)
 
-
 async def rvr_drive_straight(turn_point):
+    """drive straight until arrived at turn point or encounter an obstacle"""
     global rvr, distance_to_obstacle, rvr_position
     await rvr.reset_yaw()
-    print("distance to obstable is "+str(distance_to_obstacle))
-    # keep driving until arrive at turn point or too close to obstacle
-    print("Turn point, ({},{})".format(turn_point[0], turn_point[1]))
 
+    # keep driving until arrive at turn point or too close to obstacle, might have to change 
+    # the condition for distance_to_obstacle depending on how fast you drive rvr. The faster
+    # the number has to be larger
     while not rvr_has_arrived(pose_convert('grid', 'rvr', turn_point), rvr_position) and distance_to_obstacle >= 8:
-        print("Rvr position, ({},{})".format(rvr_position[0], rvr_position[1]))
         await rvr.drive_with_heading(
             speed=20,  # Valid speed values are 0-255
             heading=0,  # Valid heading values are 0-359
@@ -235,9 +233,8 @@ async def rvr_drive_straight(turn_point):
         erase_waypoint(pose_convert('rvr', 'grid', rvr_position))
         # Delay to allow RVR to drive
         await asyncio.sleep(0.1)
-    print('out of while')
+
     # stop rvr
-    # await rvr.raw_motors(left_speed=0, left_mode=0, right_speed=0, right_mode=0)
     await rvr.drive_with_heading(
         speed=0,  # Valid speed values are 0-255
         heading=0,  # Valid heading values are 0-359
@@ -248,6 +245,7 @@ async def rvr_drive_straight(turn_point):
 
 
 def rvr_has_arrived(p1, p2):
+    """Decide whether a location is reached"""
     if abs(p1[0]-p2[0]) < 0.05 and abs(p1[1]-p2[1]) < 0.05:
         print("arrived at turn point")
         return True
@@ -257,6 +255,7 @@ def rvr_has_arrived(p1, p2):
 
 
 async def navigate(start, goal):
+    """Main navigating logic"""
     global rvr_direction, rvr_position, rvr, grid
 
     # start path planning
@@ -266,7 +265,9 @@ async def navigate(start, goal):
     print(path)
     draw_path(path[1:], goal)
 
-    # create consecutive path
+    # create consecutive path, what this does is scanning through the planned path and merge unit vectors 
+    # that are consecutive and are in the same direction. This is for achieving driving smoothly across 
+    # waypoints that are in the same direction, instead of drive to one cell and stop then drive again
     seg_start = path[0]
     curr_position = path[0]
     curr_unit_vector = tuple(np.subtract(path[1], path[0]))
@@ -286,8 +287,9 @@ async def navigate(start, goal):
     print(consecutive_vector)
     # start navigation
     for cv in consecutive_vector:
-        # angle=angle_between(rvr_direction, cv)
-        angle = (angle_between(cv, rvr_direction) + 360) % 360
+        #Calculate angles to turn at a turn point. 
+        #Adding and moduloing is done to avoid negative value. rvr turning only takes positive value
+        angle = (angle_between(cv, rvr_direction) + 360) % 360 
         print(angle)
         # turn if current direction is not aligned with the vector
         if angle != 0:
@@ -314,12 +316,13 @@ async def navigate(start, goal):
     # if get out of for loop, this means arrived
     # turn destination color back
     destinations[goal].update_attributes(color=(255, 255, 255))
-    scene.update_object(destinations[goal])
+    scene.update_object(destinations[goal]) #updates the color of the destination circle to white
     return
 
 
 @ scene.run_forever(interval_ms=50)
 def update_distance():
+    """Detects distance to obstacle in front of RVR and also updates the value shown in the scene"""
     global distance_to_obstacle, HUD_distance
     GPIO.output(trigger, True)
     time.sleep(0.00001)
@@ -344,9 +347,8 @@ def update_distance():
     
 
 # below are arena functions
-
-
 def init():
+    """Setup destination circle"""
     global destinations
     dest = (3, 3)
     print("after convert "+str(pose_convert("grid", "arena", dest)))
@@ -363,6 +365,7 @@ def init():
 
 
 def click(scene, evt, msg):
+    """Call back function of the destination circle"""
     global rvr, rvr_position, destinations
     pose = (evt.data.position['x'],
             evt.data.position['y'], evt.data.position['z'])
@@ -370,7 +373,7 @@ def click(scene, evt, msg):
         print("clicked position is"+str(evt.data.position))
         goal = pose_convert('arena', 'grid', pose)
         start = pose_convert('rvr', 'grid', rvr_position)
-        asyncio.create_task(navigate(start, goal))
+        asyncio.create_task(navigate(start, goal)) #add navigation task to the event loop
     if evt.type == "mousedown":
         print('in mouse down')
         key = pose_convert('arena', 'grid', pose)
@@ -390,8 +393,6 @@ def draw_line(start, end):
 
 def draw_path(path, goal):
     global canvas
-    print("in draw path")
-    print(path)
     for waypoint in path:
         if waypoint != goal:
             print('way point is at ')
@@ -432,6 +433,7 @@ def draw_obstacle(waypoint):
 
 
 def user_join_callback(scene, cam, msg):
+    """Set the text object as a child of camera"""
     global HUD_distance, distance_to_obstacle
     if "camera" in cam.object_id:
         # circle1 = Circle(
