@@ -435,13 +435,6 @@ def user_join_callback(scene, cam, msg):
     """Set the text object as a child of camera"""
     global HUD_distance, distance_to_obstacle
     if "camera" in cam.object_id:
-        # circle1 = Circle(
-        #     parent=cam.object_id,
-        #     position=(0, -0.1, -0.5),
-        #     scale=(0.02, 0.02, 0.02)
-        # )
-
-        # scene.add_object(circle1)
         HUD_distance = Text(
             parent=cam.object_id,
             object_id="distance",
