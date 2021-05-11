@@ -21,10 +21,10 @@ distance_to_obstacle = 10000  # in cm
 rvr_direction = (0, 1) # Hard coded as small april tag is not supported right now
 rvr_position = (0, 0)  # Data from locator
 grid = None  # grid map, initialized in main
-canvas = {}
+canvas = {} # dictionary saving waypoints
 RED = (255, 0, 0)
-destinations = {}
-HUD_distance = None
+destinations = {} #dictionary saving distance circle objects
+HUD_distance = None #saving the object of the text showing the distance to obstacle in the scene
 
 # setting up rpi GPIO
 GPIO.setmode(GPIO.BCM)
@@ -33,7 +33,6 @@ echo = 21
 GPIO.setup(trigger, GPIO.OUT)
 GPIO.setup(echo, GPIO.IN)
 
-#occupancy grid
 class GridMap:
     def __init__(self, width, height):
         self.width = width
